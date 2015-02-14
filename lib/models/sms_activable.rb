@@ -50,9 +50,10 @@ module Devise
       end
 
       # Send confirmation token by sms
+      # if the sms_confirmation token doesn't exist or is expired, generate a new one
       def send_sms_token
         if(self.phone?)
-          generate_sms_token! if self.generate_sms_token.nil?
+          generate_sms_token! unless ( self.sms_confirmation_token && self.confirmation_sms_period_valid? )
           ::Devise.sms_sender.send_sms(self.phone, I18n.t(:"devise.sms_activations.sms_body", :sms_confirmation_token => self.sms_confirmation_token, :default => self.sms_confirmation_token))
         else
           self.errors.add(:sms_confirmation_token, :no_phone_associated)
@@ -128,7 +129,7 @@ module Devise
 
         # Generates a new random token for confirmation, and stores the time
         # this token is being generated
-        def generate_sms_token
+        def  generate_sms_token
           self.sms_confirmed_at = nil
           self.sms_confirmation_token = self.class.sms_confirmation_token
           self.confirmation_sms_sent_at = Time.now.utc
@@ -164,8 +165,9 @@ module Devise
 
           def generate_small_token(column)
             loop do
-              token = Devise.friendly_token[0,5].upcase
-              break token unless to_adapter.find_first({ column => token })
+              token = 100000 + SecureRandom.random_number(900000) # we need the token to be between 100,000 and 1,000,0000
+              # TODO: this might be optimized, otherwise it could incur lots of database queries
+              break token unless to_adapter.find_first({ column => token }) # This is to make sure the generated token is differnt from all the tokens currently already in the table
             end
           end
 
